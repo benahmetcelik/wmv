@@ -1,11 +1,11 @@
 <?php
 /*
 Plugin Name: What's My Views
-Plugin URI: https://github.com/benahmetcelik/whats-my-views
+Plugin URI: https://github.com/benahmetcelik/wmv
 Description: This plugin shows the number of views of the post.
 Version: 0.1
 Author: Ahmet ÇELİK
-Author URI: https://github.com/benahmetcelik/whats-my-views
+Author URI: https://github.com/benahmetcelik
 */
 // Ensure the `get_plugin_data` function is available
 if (!function_exists('get_plugin_data')) {
