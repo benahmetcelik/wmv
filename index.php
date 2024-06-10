@@ -7,7 +7,14 @@ Version: 0.1
 Author: Ahmet ÇELİK
 Author URI: https://github.com/benahmetcelik/whats-my-views
 */
+// Ensure the `get_plugin_data` function is available
+if (!function_exists('get_plugin_data')) {
+    require_once(ABSPATH . 'wp-admin/includes/plugin.php');
+}
 
+// Get plugin version
+$plugin_data = get_plugin_data(__FILE__);
+$plugin_version = $plugin_data['Version'];
 // Add menu
 add_action('admin_menu', 'wmv_add_menu');
 function wmv_add_menu()
@@ -36,7 +43,7 @@ function wmv_admin_menu_hook()
     if (!$text_color) {
         $text_color = '#000';
     }
-
+    // translators: %s is the number of views
     $text = __('%s Views', 'wmv_counter_text');
 
 
@@ -48,20 +55,20 @@ function wmv_admin_menu_hook()
             <table class="form-table">
                 <tr valign="top">
                     <th scope="row">Background Color</th>
-                    <td><input type="color" name="wmv_bg_color" value="<?php echo $background_color; ?>"/></td>
+                    <td><input type="color" name="wmv_bg_color" value="<?php echo esc_attr($background_color); ?>"/></td>
                 </tr>
 
                 <tr valign="top">
                     <th scope="row">Text</th>
                     <td>
-                        <input type="text" name="wmv_counter_text" value="<?php echo $text; ?>"/>
+                        <input type="text" name="wmv_counter_text" value="<?php echo esc_attr($text); ?>"/>
                     </td>
                 </tr>
 
                 <tr valign="top">
                     <th scope="row">Text Color</th>
                     <td>
-                        <input type="color" name="wmv_text_color" value="<?php echo $text_color; ?>"/>
+                        <input type="color" name="wmv_text_color" value="<?php echo esc_attr($text_color); ?>"/>
                     </td>
                 </tr>
 
@@ -90,12 +97,13 @@ function wmv_admin_enqueue_scripts()
     wp_enqueue_script('wp-color-picker');
 }
 
-add_action('wp_enqueue_scripts', 'wmv_enqueue_scripts');
 
-function wmv_enqueue_scripts()
-{
-    wp_enqueue_style('wmv-style', plugin_dir_url(__FILE__) . 'style.css');
+
+function enqueue_wmv_styles() {
+    global $plugin_version;
+    wp_enqueue_style('wmv-style', plugin_dir_url(__FILE__) . 'style.css', array(), $plugin_version);
 }
+
 
 
 
@@ -124,7 +132,7 @@ add_filter('the_content', 'wmv_counter');
 add_action('manage_posts_custom_column', function ($column, $post_id) {
     if ($column === 'wmv_count') {
         $count = get_post_meta($post_id, 'wmv_count', true);
-        echo "<h4>$count</h4>";
+        $text = "<h4>".esc_attr($count)."</h4>";
     }
 }, 10, 2);
 
@@ -152,40 +160,58 @@ function getViewHtml($content,$view)
     if (!$text_color) {
         $text_color = '#000';
     }
+    // translators: %s is the number of views
     $text = __('%s Views', 'wmv_counter_text');
     $text = str_replace('%s', $view, $text);
-    $template = file_get_contents(__DIR__ . '/template.html');
+    $template = wp_remote_get(__DIR__ . '/template.html');
 
     $template = str_replace('%s', $text_color, $template);
     $template = str_replace('%d', $background_color, $template);
     $template = str_replace('%f', $text, $template);
     $content .= $template;
+    enqueue_wmv_styles();
     return $content;
 }
 
 function wmv_dashboard_widget()
 {
-    $args = [
-        'post_type' => 'post',
-        'meta_key' => 'wmv_count',
-        'orderby' => 'meta_value_num',
-        'order' => 'DESC',
-        'posts_per_page' => 5,
-    ];
-    $query = new WP_Query($args);
+    if ( false === ( $results = get_transient( 'wmv_top_posts' ) ) ) {
+        $args = [
+            'post_type' => 'post',
+            'meta_key' => 'wmv_count',
+            'orderby' => 'meta_value_num',
+            'order' => 'DESC',
+            'posts_per_page' => 5,
+        ];
+        $query = new WP_Query($args);
+        $results = $query->get_posts();
+        set_transient( 'wmv_top_posts', $results, HOUR_IN_SECONDS );
+    }
 
-    $results = $query->get_posts();
+    enqueue_wmv_styles();
+
+    // Output the results
     echo '<ul>';
     foreach ($results as $result) {
         echo '<li>';
-        echo '<a href="' . get_permalink($result->ID) . '">';
-        echo $result->post_title;
+        echo '<a href="' . esc_url(get_permalink($result->ID)) . '">';
+        echo esc_html($result->post_title);
         echo '</a>';
         echo ' - ';
-        echo get_post_meta($result->ID, 'wmv_count', true).' Views';
+        echo esc_html(get_post_meta($result->ID, 'wmv_count', true)).' Views';
         echo '</li>';
     }
     echo '</ul>';
 }
 
+
+function wmv_clear_transient() {
+    delete_transient('wmv_top_posts');
+}
+
+if (!wp_next_scheduled('wmv_daily_event')) {
+    wp_schedule_event(time(), 'daily', 'wmv_daily_event');
+}
+
+add_action('wmv_daily_event', 'wmv_clear_transient');
 
