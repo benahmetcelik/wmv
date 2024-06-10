@@ -10,4 +10,5 @@ The simple post view counter
 
 == Description ==
 
-The simple post view counter
+
+This plugin is a post view counter. With this plugin, you can see your most viewed posts as a widget in the admin panel. On the Admin Posts page, you can view how many views each post has. Your visitors can see how many people have viewed each post through a customizable theme.
